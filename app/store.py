@@ -20,6 +20,21 @@ DDL = (
         UNIQUE (run_id, shelf_key, version),
         UNIQUE (run_id, request_id)
     )''',
+    '''CREATE TABLE IF NOT EXISTS attribution_batches (
+        batch_id TEXT PRIMARY KEY,
+        status TEXT NOT NULL CHECK (status IN ('DRAFT', 'CONFIRMED')),
+        snapshot TEXT NOT NULL,
+        created_at TEXT NOT NULL
+    )''',
+    '''CREATE TABLE IF NOT EXISTS attribution_events (
+        seq INTEGER PRIMARY KEY,
+        batch_id TEXT NOT NULL REFERENCES attribution_batches(batch_id),
+        version INTEGER NOT NULL CHECK (version > 0),
+        request_id TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        event TEXT NOT NULL,
+        UNIQUE (batch_id, request_id)
+    )''',
 )
 
 
@@ -80,4 +95,53 @@ class Store:
             connection.execute('''INSERT INTO appeal_events
                 (run_id, shelf_key, version, request_id, payload, event) VALUES (?, ?, ?, ?, ?, ?)''',
                 (run_id, event['key'], event['version'], payload['request_id'], raw, canonical(event)))
+            return event, False
+
+    @staticmethod
+    def read_attribution(connection, batch_id, required=True):
+        found = connection.execute('SELECT snapshot FROM attribution_batches WHERE batch_id = ?', (batch_id,)).fetchone()
+        if found is None:
+            if required:
+                raise AuditError('ATTRIBUTION_NOT_FOUND', '未找到该归属批次', 404)
+            return None
+        events = [json.loads(row['event']) for row in
+                  connection.execute('SELECT event FROM attribution_events WHERE batch_id = ? ORDER BY seq', (batch_id,))]
+        snapshot = json.loads(found['snapshot'])
+        snapshot['events'] = events
+        snapshot['version'] = len(events)
+        return snapshot
+
+    def get_attribution(self, batch_id, required=True):
+        with self.connection() as connection:
+            return self.read_attribution(connection, batch_id, required)
+
+    def save_attribution(self, snapshot):
+        batch_id = snapshot['batch_id']
+        record = canonical(snapshot)
+        with self.connection(write=True) as connection:
+            inserted = connection.execute(
+                'INSERT INTO attribution_batches VALUES (?, ?, ?, ?) ON CONFLICT(batch_id) DO NOTHING',
+                (batch_id, snapshot['status'], record, snapshot['created_at']))
+            return self.read_attribution(connection, batch_id), inserted.rowcount == 0
+
+    def confirm_attribution(self, batch_id, payload, build):
+        with self.connection(write=True) as connection:
+            snapshot = self.read_attribution(connection, batch_id)
+            raw = canonical(payload)
+            old = connection.execute('SELECT payload, event FROM attribution_events WHERE batch_id = ? AND request_id = ?',
+                                     (batch_id, payload['request_id'])).fetchone()
+            if old:
+                if old['payload'] != raw:
+                    raise AuditError('REQUEST_CONFLICT', '提交编号已用于其他内容', 409)
+                return json.loads(old['event']), True
+            event = build(snapshot, payload)
+            connection.execute('''INSERT INTO attribution_events
+                (batch_id, version, request_id, payload, event) VALUES (?, ?, ?, ?, ?)''',
+                (batch_id, event['version'], payload['request_id'], raw, canonical(event)))
+            snapshot['status'] = 'CONFIRMED'
+            snapshot['published_at'] = event['created_at']
+            snapshot['events'] = [*snapshot.get('events', []), event]
+            snapshot['version'] = event['version']
+            connection.execute('UPDATE attribution_batches SET status = ?, snapshot = ? WHERE batch_id = ?',
+                               ('CONFIRMED', canonical(snapshot), batch_id))
             return event, False

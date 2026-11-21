@@ -4,14 +4,30 @@ from app.main import create_app
 from conftest import appeal_payload
 
 
-def test_home_and_seven_action_entries(client, run):
+def test_home_and_eight_action_entries(client, run):
     page = client.get('/')
     assert page.status_code == 200
-    assert all(word in page.text for word in ('证据严重度矩阵', '分层样本缺口', '运行审计', '导出证据'))
+    assert all(word in page.text for word in ('证据严重度矩阵', '分层样本缺口', '运行审计', '导出证据', '换码归属'))
     for stage, key in [('intake', 'stores'), ('plans', 'decisions'), ('photos', 'bindings'), ('coverage', 'strata'),
                        ('penalties', 'rows'), ('settlement', 'original_cents'), (f"appeals/{run['manifest']['run_id']}", 'net_cents')]:
         result = client.get(f'/api/{stage}')
         assert result.status_code == 200 and key in result.json()
+    attribution = client.get('/api/attribution')
+    assert attribution.status_code == 200
+    body = attribution.json()
+    assert body['status'] == 'DRAFT' and 'batch_id' in body and body['totals']['fine_cents'] == 0
+
+
+def test_attribution_batch_lifecycle_through_http(client):
+    created = client.post('/api/attribution/batches', json={}).json()
+    assert created['reused'] is False
+    bid = created['batch_id']
+    assert client.post('/api/attribution/batches', json={}).json()['reused'] is True
+    form = {'request_id': 'E2E-CONF-001', 'actor': '林归属', 'note': '工作台发布', 'evidence_ref': '路由簿-7'}
+    confirmed = client.post(f'/api/attribution/batches/{bid}/confirm', json=form)
+    assert confirmed.status_code == 200 and confirmed.json()['batch']['status'] == 'CONFIRMED'
+    evidence = client.get(f'/api/attribution/batches/{bid}/evidence')
+    assert evidence.status_code == 200 and evidence.json()['batch_id'] == bid
 
 
 def test_api_contract_returns_explicit_errors(client):

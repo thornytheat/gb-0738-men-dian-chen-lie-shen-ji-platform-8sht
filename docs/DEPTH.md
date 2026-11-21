@@ -14,6 +14,7 @@
 | M5 罚则裁决 | 确定缺品、乱陈、排面和价签的处罚 | `GET /api/penalties` | `app/modules/penalties/rules.py` `app/modules/penalties/service.py` | `tests/test_penalties.py` |
 | M6 结算勾稽 | 按原件、柜位和金额对账并留存批次 | `GET /api/settlement` `POST /api/settlement/runs` | `app/modules/settlement/reconcile.py` `app/modules/settlement/service.py` `app/store.py` | `tests/test_settlement.py` |
 | M7 异议复核 | 留存复核时序、重算净额并导出 | `GET /api/appeals/{run_id}` `POST /api/appeals/{run_id}/events` | `app/modules/appeals/transitions.py` `app/modules/appeals/service.py` | `tests/test_appeals.py` |
+| M8 换码归属 | 门店级换码路由、旧名候选保留、发布勾稽与凭据追回 | `GET /api/attribution` `POST /api/attribution/batches` `POST /api/attribution/batches/{batch_id}/confirm` | `app/modules/attribution/routes.py` `app/modules/attribution/service.py` `app/modules/attribution/reconcile.py` `app/store.py` | `tests/test_attribution.py` |
 
 ## 陷阱登记
 
@@ -41,6 +42,10 @@
 | TRAP-26 | `sample_data/field/` 的 `002:A03` 异议测试以旧版本重提 | 覆盖已受理 | 版本锁加唯一请求键 | `app/modules/appeals/transitions.py` `app/store.py` | `tests/test_appeals.py::test_stale_appeal_version_cannot_override_current_stage` |
 | TRAP-27 | `sample_data/field/photos/P002.png` 与 `P010.png` 字节相同且绑不同柜位 | 文件名不同便放行 | 实际 SHA-256 验两侧绑定 | `app/modules/photos/fingerprints.py` `app/modules/photos/bindings.py` | `tests/test_photos.py::test_different_file_names_with_equal_bytes_flag_both_bindings` |
 | TRAP-28 | `sample_data/field/` 的 `001:A04` 缺图、`002:A03` 已完成清点但缺品 | 都当缺品开罚，或都搁置 | 前者待证且 0 元，后者罚 150 元 | `app/modules/coverage/service.py` `app/modules/penalties/rules.py` | `tests/test_penalties.py::test_missing_photo_and_missing_sku_have_distinct_amounts` |
+| TRAP-29 | 「谷雨陈酿」在 001/003 店归 GR-209、004/006 店归 GR-211，现场仍用旧名 | 用全局别名把两种去向混成一个商品 | 门店级 `skumap` 路由按店定去向，合并商品按最终 SKU 分列 | `app/modules/attribution/service.py` `app/modules/attribution/routes.py` | `tests/test_attribution.py::test_same_old_name_splits_into_two_skus_by_store_without_merging` |
+| TRAP-30 | 草稿阶段旧名条目 | 提前把全局旧归属写死或直接开罚 | 保留现场旧名与全部候选去向，罚额恒为 0，确认后才给最终归属 | `app/modules/attribution/service.py` | `tests/test_attribution.py::test_draft_keeps_old_name_and_candidates_and_never_fines` |
+| TRAP-31 | 同店同旧名路由表出现两个去向 | 静默选一行或回落到全局别名 | 整组路由隔离，条目不给出向并以 `ATTRIBUTION_TARGET_MISSING` 阻断发布 | `app/modules/attribution/routes.py` `app/modules/attribution/reconcile.py` | `tests/test_attribution.py::test_conflicting_route_quarantines_all_copies` |
+| TRAP-32 | 同一确认重复提交、发布期勾稽失败 | 重复生成批次，或失败覆盖旧版结论 | 批次键与 `request_id` 幂等；确认事务化，失败回滚保留草稿和原凭据 | `app/store.py` `app/modules/attribution/handler.py` | `tests/test_attribution.py::test_confirmation_is_idempotent_and_repeat_publish_is_rejected` `tests/test_attribution.py::test_failed_confirmation_keeps_draft_and_its_original_evidence` |
 
 ## 对账
 
@@ -48,3 +53,4 @@
 - 原罚额 29 500 分＝15 000 缺品＋5 500 排面不足＋9 000 错品。
 - 七档原件均按源行号对账。清点表 50＝40 采信＋10 隔离；两条同柜矛盾行有各自来源。
 - 异议记录逐柜追加，最终净额从原罚额减去确认的减免。对账支持同计数但错行、元分混用和重复事件等反例。
+- 换码归属：条目总数＝各店条目之和＝各合并商品条目之和；草稿与发布态罚额恒为 0；同名旧装按门店路由拆成独立 SKU，已发布批次重启后凭据仍可追回。

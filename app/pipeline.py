@@ -10,6 +10,7 @@ from app.modules.settlement.reconcile import reconcile
 
 class Audit:
     def __init__(self, settings, options):
+        self.settings = settings
         self.bundle = acquire(settings.sample_root, options.dataset)
         self.options = options
 

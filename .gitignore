@@ -24,7 +24,8 @@ out/
 .cache/
 .vite/
 .parcel-cache/
-coverage/
+/coverage/
+!app/modules/coverage/
 *.pyc
 venv/
 target/

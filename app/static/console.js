@@ -72,8 +72,12 @@ function refreshDetails() {
   get('detail-title').textContent = link.textContent.trim();
   get('clear-filter').hidden = !state.filter;
   const payload = state.snapshot?.[state.panel] || state.preview;
-  details(get('detail-body'), state.panel, payload, {dataset: state.snapshot?.manifest.parameters.dataset || options().dataset,
-    filter: state.filter});
+  details(get('detail-body'), state.panel, payload, {
+    dataset: state.snapshot?.manifest.parameters.dataset || options().dataset,
+    filter: state.filter,
+    params: options,
+    actor: '换码复核员',
+  });
   fillAppeals();
 }
 
@@ -115,7 +119,7 @@ async function openPanel(section, filter = null, focus = true) {
     get('detail-title').focus({preventScroll: true});
     get('detail').scrollIntoView({block: 'start'});
   }
-  if (state.snapshot || section === 'appeals' || !form.reportValidity()) return;
+  if (state.snapshot || section === 'appeals' || section === 'attribution' || !form.reportValidity()) return;
   get('detail-body').replaceChildren(element('p', '正在读取档件。', 'empty'));
   try {
     const result = await json(`/api/${section}?${new URLSearchParams(options())}`);
@@ -194,6 +198,10 @@ get('cases').addEventListener('click', event => {
 });
 get('appeal-key').addEventListener('change', updateActions);
 get('appeal-action').addEventListener('change', updateReduction);
+get('detail-body').addEventListener('attribution:update', event => {
+  state.preview = event.detail;
+  refreshDetails();
+});
 form.addEventListener('change', () => { if (state.panel && !state.snapshot) openPanel(state.panel, null, false); });
 const section = nav.find(link => link.hash === location.hash);
 if (section) openPanel(section.dataset.panel, null, false);

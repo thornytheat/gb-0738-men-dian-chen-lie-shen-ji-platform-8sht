@@ -1,4 +1,5 @@
 import {element, flag, money, reason, outcomes, names} from './figures.js';
+import {attribution} from './attribution.js';
 
 const raw = origin => origin?.raw.join(' | ');
 const source = origin => origin?.id;
@@ -123,5 +124,6 @@ export function details(root, key, payload, options) {
   }
   if (key === 'photos') photos(root, payload, options.dataset);
   else if (key === 'penalties') penalties(root, payload, options.filter);
+  else if (key === 'attribution') attribution(root, payload, options);
   else ({intake, plans, coverage, settlement, appeals})[key](root, payload);
 }

@@ -14,6 +14,15 @@ docker compose up --build
 
 可在「异议复核」选 `002:A03`，提交发起事件，再录入复核决定。部分减免 6000 分后，原罚额仍为 295 元、净罚额为 235 元。工具条可下载一份 JSON 证据。
 
+## 换码归属
+
+换码期现场仍抄录旧名。`skumap.csv` 给出门店级换码路由：「谷雨陈酿」在 001、003 店归 `GR-209`，在 004、006 店归 `GR-211`。在「换码归属」面板先 `GET /api/attribution` 预览草稿，确认前保留现场旧名与全部候选去向且不下任何罚额；再生成批次并发布。发布时校验总数＝各店条目之和＝各合并商品条目之和，同名旧装的两种去向始终是两个独立商品，不会合并。
+
+- 相同档件重跑取回同一批次（批次键由路由相关原件摘要、参数和规则版本决定），不重复生成；同 `request_id` 的确认可重放，换内容返回 409。
+- 发布勾稽失败或版本过期时事务回滚，旧版草稿与原凭据原样保留。
+- 已发布批次可随时通过 `GET /api/attribution/batches/{batch_id}/evidence` 追回完整 JSON 凭据，重启服务后仍可读取。
+- 同店同旧名出现多个去向时整组路由隔离并阻断发布；门店未登记、旧名未在旧名册登记的路由行进隔离区。
+
 ```bash
 docker compose exec -T app pytest -q
 ```
@@ -41,7 +50,8 @@ Compose 使用 `audit-data` 命名卷；本地数据库默认为 `data/audits.sq
 | 罚则裁决 | `GET /api/penalties` | 区分缺图、缺品及无法裁决，择一执行罚则 |
 | 结算勾稽 | `GET /api/settlement`、`POST /api/settlement/runs` | 对账预览或生成可复用的结算批次 |
 | 异议复核 | `GET /api/appeals/{run_id}`、`POST /api/appeals/{run_id}/events` | 查看并追加复核事件，核算净额 |
+| 换码归属 | `GET /api/attribution`、`POST /api/attribution/batches`、`POST /api/attribution/batches/{batch_id}/confirm` | 门店级换码路由、旧名候选保留、发布勾稽与凭据追回 |
 
-预检接口接受 `dataset=field` 或 `dataset=reference`，以及可选 `sample_size`。运行提交同名 JSON 字段。使用 `GET /api/settlement/runs/{run_id}` 读取批次，使用 `GET /api/appeals/{run_id}/export` 下载证据。接口目录位于 `/docs`。
+预检接口接受 `dataset=field` 或 `dataset=reference`，以及可选 `sample_size`。运行提交同名 JSON 字段。使用 `GET /api/settlement/runs/{run_id}` 读取批次，使用 `GET /api/appeals/{run_id}/export` 下载证据。归属批次用 `GET /api/attribution/batches/{batch_id}` 读取、`GET /api/attribution/batches/{batch_id}/evidence` 下载凭据。接口目录位于 `/docs`。
 
 [字段与规则](docs/DATA-DICTIONARY.md) · [测试证据](docs/DEPTH.md)

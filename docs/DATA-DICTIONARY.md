@@ -10,6 +10,7 @@
 | `visits.csv` | `visit`, `store`, `clock` | 巡检编号及发生时间，允许带偏移或按门店时区解释本地时间 |
 | `plans.csv` | `plan`, `category`, `start_utc`, `end_utc`, `sku`, `facings`, `price_cents` | 单柜单应陈商品的版本窗口、最少排面、规定价签 |
 | `aliases.csv` | `alias`, `sku` | 商品旧名到当前编号，可跨多跳，循环与归属冲突整批拒绝 |
+| `skumap.csv` | `store`, `alias`, `sku` | 门店级换码路由：某店某旧名在换码期的归属 SKU；同店同旧名多去向整组隔离 |
 | `photos.csv` | `photo`, `visit`, `slot`, `file`, `captured` | 原件编号、柜位绑定、拍摄时刻，`file` 关联 `photos/` 中的 PNG |
 | `observations.csv` | `visit`, `slot`, `photo`, `kind`, `sku`, `facings`, `price_cents` | 人工清点明细，`ITEM` 给商品、排面和价签，`COMPLETE` 标记清点完毕且商品列须空 |
 
@@ -36,3 +37,11 @@
 运行键用全部源文件与照片 SHA-256、有效参数、规则版本生成，SQLite 原子保存完整快照。异议事件只追加，柜位状态从未发起到 `OPEN`，再到 `UPHELD`、`WAIVED` 或 `REDUCED`。`expected_version` 从 0 开始。完全相同的 `request_id` 和内容可重放，键复用但内容不同返回 409。部分减免必须大于 0 并小于原罚额；全减使用 `WAIVED`。每条事件带经办人、说明、依据编号、原罚额、原罚则和陈列图源行。
 
 随项目附合成货架缩略原件以演示字节查重。通过人工清点表判断商品，未做图像识别、感知重复、EXIF 验真、在线上传、后台身份认证或记账系统回写。证据包包含照片摘要而无需重复打包图片字节，清点表与原始字段一并留存。
+
+## 换码归属批次
+
+换码期门店现场仍抄录旧名。全局 `aliases.csv` 只负责旧字形解析；门店级 `skumap.csv` 决定换码旧名的实际去向，且只对出现在路由表中的旧名生效。不在路由管理范围的旧名继续沿用全局旧名册。路由表门店未登记给 `SKUMAP_STORE_UNKNOWN`，旧名不在旧名册给 `SKUMAP_ALIAS_UNKNOWN`，同店同旧名多个去向给 `SKUMAP_ROUTE_CONFLICT` 并整组隔离，不静默择一。
+
+归属条目保留现场录入旧名、规范化名、全部候选去向、门店路由源行与零罚额。草稿（`DRAFT`）阶段只预览、不下罚额；路由缺失或冲突的旧名条目不给出向，发布勾稽以 `ATTRIBUTION_TARGET_MISSING` 阻断。发布（`CONFIRM`）要求：条目总数＝各店条目之和＝各合并商品条目之和，商品分门店明细加总等于商品条目数，且全部条目的罚额恒为 0。同名旧装在不同门店的两种去向是两个独立合并商品，例如「谷雨陈酿」在 001/003 店并入 `GR-209`、在 004/006 店并入 `GR-211`，不会合成一个商品。
+
+批次键由 `campaign.json`、`stores.csv`、`visits.csv`、`aliases.csv`、`skumap.csv`、`observations.csv`、`photos.csv` 的 SHA-256、数据集参数和规则版本决定；同档件重跑取回同一批次。确认事件只追加，`request_id` 同键同内容可重放、同键异内容返回 409，重复发布返回 `ATTRIBUTION_NOT_DRAFT`。批次快照与确认事件在同一 SQLite 事务内更新，任何步骤失败整体回滚，旧版草稿与凭据保留。已发布批次的完整凭据（含原因字典、路由源行、发布时间线）可随时通过证据接口追回，应用重启后仍然有效。

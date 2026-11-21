@@ -11,6 +11,7 @@ HEADERS = {
     'visits': ('visit', 'store', 'clock'),
     'plans': ('plan', 'category', 'start_utc', 'end_utc', 'sku', 'facings', 'price_cents'),
     'aliases': ('alias', 'sku'),
+    'skumap': ('store', 'alias', 'sku'),
     'photos': ('photo', 'visit', 'slot', 'file', 'captured'),
     'observations': ('visit', 'slot', 'photo', 'kind', 'sku', 'facings', 'price_cents'),
 }

@@ -13,6 +13,10 @@ REASONS = {
     'BAD_OBSERVATION': '清点行格式无效', 'OBSERVATION_CONFLICT': '同商品清点结果矛盾',
     'MISSING_SKU': '应陈商品未出现', 'WRONG_SKU': '出现陈列图外的商品',
     'UNDER_FACINGS': '应陈商品排面不足', 'PRICE_MISMATCH': '标价与陈列图不符',
+    'SKUMAP_STORE_UNKNOWN': '路由表门店未登记', 'SKUMAP_ALIAS_UNKNOWN': '路由表旧名未在旧名册登记',
+    'SKUMAP_ROUTE_CONFLICT': '同店同旧名有多个去向', 'ATTRIBUTION_TARGET_MISSING': '旧名在该门店无归属路由',
+    'ATTRIBUTION_LEDGER_MISMATCH': '归属条目与跨区合并对账失败', 'ATTRIBUTION_NOT_DRAFT': '归属批次已发布，不能重复确认',
+    'ATTRIBUTION_NOT_CONFIRMED': '归属批次尚未发布', 'STALE_ATTRIBUTION': '归属版本已变化，请刷新',
 }
 
 
